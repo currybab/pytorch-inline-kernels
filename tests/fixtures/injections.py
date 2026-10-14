@@ -81,8 +81,34 @@ BLOCK = 256
 templated_kernel = f"""// EXPECT:cuda
 __global__ void k(float* x) {{ int i = {BLOCK}; }}
 """
+back_to_back_cuda = f"// EXPECT:cuda {BLOCK}{BLOCK} int a; {BLOCK}{BLOCK} int b;"
+load_inline(name="kw_fstring", cpp_sources=f"// EXPECT:cpp {BLOCK} int a; {BLOCK}{BLOCK} int b;")
+
+# --- wrapped strings: dedent / cleandoc / strip and implicit concatenation ----
+# Every rule above applies to these forms too. Concatenated pieces form one
+# injection.
+
+cuda_dedent = textwrap.dedent("""// EXPECT:cuda""")
+cpp_dedent = dedent("// EXPECT:cpp")
+cuda_cleandoc = inspect.cleandoc("// EXPECT:cuda")
+cuda_strip = "// EXPECT:cuda".strip()
+cpp_dedent_strip = textwrap.dedent("// EXPECT:cpp").lstrip()
+cuda_concat = ("// EXPECT:cuda" "// EXPECT:cuda")
+cpp_concat_bare = "// EXPECT:cpp" "// EXPECT:cpp"
+dedented_source = textwrap.dedent("__global__ void k() {} // EXPECT:cuda")
+stripped_decl = "torch::Tensor f(torch::Tensor x); // EXPECT:cpp".strip()
+
+# cuda
+marked_dedent = textwrap.dedent("// EXPECT:cuda")
 
 # --- must not be injected ----------------------------------------------------
+
+cuda_other_call = format_source("// EXPECT:none")
+cuda_other_method = "// EXPECT:none".upper()
+cuda_two_args = textwrap.dedent("// EXPECT:none", "// EXPECT:none")
+wrapped_content = format_source("__global__ EXPECT:none")
+# cuda
+marked_call = format_source("// EXPECT:none")
 
 greeting = "hello // EXPECT:none"
 cuda_count = 3

@@ -27,6 +27,10 @@ class Injection:
     def within(self, node: Node) -> bool:
         return all(node.start_byte <= start and end <= node.end_byte for start, end in self.ranges)
 
+    def touches(self, node: Node) -> bool:
+        """True when any range lies inside node; concatenated strings share one injection."""
+        return any(node.start_byte <= start and end <= node.end_byte for start, end in self.ranges)
+
 
 @dataclass(frozen=True)
 class Expectation:
@@ -72,12 +76,32 @@ def collect_injections_rust(runner: Path) -> tuple[Injection, ...]:
     return tuple(injections)
 
 
-def iter_strings(node: Node):
-    if node.type == "string":
+def iter_nodes(node: Node, node_type: str):
+    if node.type == node_type:
         yield node
         return
     for child in node.children:
-        yield from iter_strings(child)
+        yield from iter_nodes(child, node_type)
+
+
+def iter_strings(node: Node):
+    yield from iter_nodes(node, "string")
+
+
+def alternation_blocks(source: str, opener: str) -> list[str]:
+    """Returns each `[...]` that follows `opener`, matched by bracket depth."""
+    blocks = []
+    start = source.find(opener)
+    while start != -1:
+        index = start + len(opener) - 1
+        depth = 0
+        for end in range(index, len(source)):
+            depth += {"[": 1, "]": -1}.get(source[end], 0)
+            if depth == 0:
+                break
+        blocks.append(source[index : end + 1])
+        start = source.find(opener, end)
+    return blocks
 
 
 def collect_expectations(root: Node) -> tuple[Expectation, ...]:
@@ -115,7 +139,7 @@ def test_every_marked_string_is_injected_as_expected(
 ) -> None:
     failures = []
     for expectation in collect_expectations(fixture_tree):
-        found = [i.language for i in injections if i.within(expectation.node)]
+        found = [i.language for i in injections if i.touches(expectation.node)]
         wanted = [] if expectation.language is None else [expectation.language]
         if found != wanted:
             failures.append(f"line {expectation.line}: expected {wanted}, got {found}")
@@ -126,10 +150,32 @@ def test_fstring_segments_form_a_single_injection(
     fixture_tree: Node, injections: tuple[Injection, ...]
 ) -> None:
     fstrings = [s for s in iter_strings(fixture_tree) if s.text.startswith(b"f")]
-    assert fstrings, "fixture must contain an f-string kernel"
-    matching = [i for i in injections if i.within(fstrings[0])]
-    assert len(matching) == 1
-    assert len(matching[0].ranges) > 1, "interpolations should split the content ranges"
+    assert len(fstrings) >= 3, "fixture must contain f-string kernels"
+    for fstring in fstrings:
+        segments = [c for c in fstring.named_children if c.type == "string_content"]
+        matching = [i for i in injections if i.touches(fstring)]
+        assert len(matching) == 1, f"line {fstring.start_point.row + 1}"
+        assert matching[0].ranges == tuple((s.start_byte, s.end_byte) for s in segments)
+
+
+def test_concatenated_pieces_form_a_single_injection(
+    fixture_tree: Node, injections: tuple[Injection, ...]
+) -> None:
+    concatenations = list(iter_nodes(fixture_tree, "concatenated_string"))
+    assert len(concatenations) >= 2, "fixture must contain concatenated kernels"
+    for concatenation in concatenations:
+        matching = [i for i in injections if i.touches(concatenation)]
+        assert len(matching) == 1
+        assert matching[0].within(concatenation)
+        assert len(matching[0].ranges) == len(concatenation.named_children)
+
+
+def test_wrapped_string_forms_are_identical_in_every_rule() -> None:
+    # The `right: [...]` alternation is repeated in each assignment rule; a
+    # form added to one copy only would silently apply to some rules.
+    blocks = [" ".join(block.split()) for block in alternation_blocks(INJECTIONS.read_text(), "right: [")]
+    assert len(blocks) == 6
+    assert len(set(blocks)) == 1
 
 
 def test_no_injection_is_reported_twice(injections: tuple[Injection, ...]) -> None:

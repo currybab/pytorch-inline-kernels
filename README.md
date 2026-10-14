@@ -81,10 +81,18 @@ first match applies, so a string is never highlighted twice.
   (`cuda_sources=[a_src, b_src]`), each variable is judged where it is defined, by rules 2–4.
 - In rule 2 a prefix beats a suffix: `cpp_kernel` is C++, `cuda_wrapper_cpp` is CUDA. Only names
   are case-insensitive; the rule 3 keywords are matched exactly, as they are case-sensitive in C++.
-- Rules 2–4 apply only to assignments of the form `name = "..."`, `self.name = "..."` or
-  `name: str = "..."`.
+- Rules 2–4 apply only to assignments of the form `name = ...`, `self.name = ...` or
+  `name: str = ...`, where the value is one of:
+  - a string: `"..."`;
+  - implicitly concatenated strings, `"..." "..."` or the same split over lines inside
+    parentheses, highlighted together as one document;
+  - `dedent("...")`, `textwrap.dedent("...")` or `inspect.cleandoc("...")` with a single string;
+  - `.strip()`, `.lstrip()` or `.rstrip()` on either of the above, e.g.
+    `textwrap.dedent("""...""").strip()`.
 - A rule 4 marker must sit directly above the assignment. Blank lines in between are fine; another
-  comment in between is not.
+  comment in between is not. A trailing comment counts too: after `x = 1  # cuda`, the string on
+  the next line is highlighted as CUDA, because queries cannot tell a trailing comment from one on
+  its own line.
 - Plain strings, `r"..."`, `b"..."` and triple-quoted strings all work.
 - In f-strings (`f"""... {BLOCK} ..."""`), the `{...}` parts stay Python and the remaining pieces
   are highlighted together as one C++/CUDA document.
@@ -95,7 +103,8 @@ first match applies, so a string is never highlighted twice.
 | Code | Why | Instead |
 | --- | --- | --- |
 | `cuda_src += "..."` | `+=` is not covered by the assignment rules | Write it as one string |
-| `cuda_src = ("..." "...")` | Implicitly concatenated strings | Use one triple-quoted string |
+| `cuda_src = build("...")`, `cuda_src = "...".format(...)` | Only `dedent`/`cleandoc` calls and `strip` methods are recognized | Assign the string first, then transform it |
+| `cuda_sources=textwrap.dedent("...")` | Rule 1 takes strings and lists/tuples of strings only | Assign it to a variable first |
 | `{"cuda": "__global__ ..."}`, `return "__global__ ..."` | Not an assignment | Assign it to a variable first |
 | `load_inline("m", "torch::Tensor f();")` | Positional arguments have no name | Use a keyword argument or a variable |
 | `load_inline(cuda_src="...")` | Only `*_sources` keyword arguments count | — |
