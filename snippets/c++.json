@@ -1,0 +1,131 @@
+{
+  "include_torch_extension": {
+    "prefix": [
+      "include_torch",
+      "torch_extension_h"
+    ],
+    "body": "#include <torch/extension.h>",
+    "description": "PyTorch C++ extension header"
+  },
+  "include_cuda_context": {
+    "prefix": "include_cuda_context",
+    "body": "#include <ATen/cuda/CUDAContext.h>",
+    "description": "ATen CUDA context (current stream, device props)"
+  },
+  "tensor_function": {
+    "prefix": [
+      "tensor_fn",
+      "torch_function"
+    ],
+    "body": [
+      "torch::Tensor ${1:name}(torch::Tensor ${2:x}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Function taking and returning torch::Tensor"
+  },
+  "TORCH_CHECK": {
+    "prefix": "TORCH_CHECK",
+    "body": "TORCH_CHECK(${1:condition}, \"${2:message}\");",
+    "description": "Raise a Python error when condition is false"
+  },
+  "check_cuda": {
+    "prefix": "check_cuda",
+    "body": "TORCH_CHECK(${1:x}.is_cuda(), \"${1:x} must be a CUDA tensor\");",
+    "description": "Require a CUDA tensor"
+  },
+  "check_contiguous": {
+    "prefix": "check_contiguous",
+    "body": "TORCH_CHECK(${1:x}.is_contiguous(), \"${1:x} must be contiguous\");",
+    "description": "Require a contiguous tensor"
+  },
+  "check_input_macros": {
+    "prefix": [
+      "CHECK_INPUT",
+      "check_macros"
+    ],
+    "body": [
+      "#define CHECK_CUDA(x) TORCH_CHECK(x.is_cuda(), #x \" must be a CUDA tensor\")",
+      "#define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x \" must be contiguous\")",
+      "#define CHECK_INPUT(x) CHECK_CUDA(x); CHECK_CONTIGUOUS(x)"
+    ],
+    "description": "CHECK_CUDA / CHECK_CONTIGUOUS / CHECK_INPUT macros"
+  },
+  "data_ptr": {
+    "prefix": "data_ptr",
+    "body": "${1:x}.data_ptr<${2:float}>()",
+    "description": "Raw pointer to tensor data"
+  },
+  "packed_accessor": {
+    "prefix": [
+      "packed_accessor32",
+      "accessor"
+    ],
+    "body": "${1:x}.packed_accessor32<${2:scalar_t}, ${3:2}, torch::RestrictPtrTraits>()",
+    "description": "Packed accessor for passing a tensor to a kernel"
+  },
+  "empty_like": {
+    "prefix": [
+      "torch_empty_like",
+      "empty_like"
+    ],
+    "body": "auto ${1:out} = torch::empty_like(${2:x});",
+    "description": "Uninitialized tensor shaped like x"
+  },
+  "zeros_like_options": {
+    "prefix": [
+      "torch_zeros",
+      "zeros"
+    ],
+    "body": "auto ${1:out} = torch::zeros({${2:n}}, ${3:x}.options());",
+    "description": "Zero tensor with x's dtype and device"
+  },
+  "AT_DISPATCH_FLOATING_TYPES": {
+    "prefix": "AT_DISPATCH_FLOATING_TYPES",
+    "body": [
+      "AT_DISPATCH_FLOATING_TYPES(${1:x}.scalar_type(), \"${2:name}\", ([&] {",
+      "\t$0",
+      "}));"
+    ],
+    "description": "Dispatch on float/double; use scalar_t inside"
+  },
+  "AT_DISPATCH_FLOATING_TYPES_AND_HALF": {
+    "prefix": "AT_DISPATCH_FLOATING_TYPES_AND_HALF",
+    "body": [
+      "AT_DISPATCH_FLOATING_TYPES_AND_HALF(${1:x}.scalar_type(), \"${2:name}\", ([&] {",
+      "\t$0",
+      "}));"
+    ],
+    "description": "Dispatch on float/double/half; use scalar_t inside"
+  },
+  "current_cuda_stream": {
+    "prefix": [
+      "current_stream",
+      "getCurrentCUDAStream"
+    ],
+    "body": "at::cuda::getCurrentCUDAStream()",
+    "description": "PyTorch's current CUDA stream (needs ATen/cuda/CUDAContext.h)"
+  },
+  "kernel_launch_check": {
+    "prefix": "C10_CUDA_KERNEL_LAUNCH_CHECK",
+    "body": "C10_CUDA_KERNEL_LAUNCH_CHECK();",
+    "description": "Raise if the last kernel launch failed"
+  },
+  "PYBIND11_MODULE": {
+    "prefix": "PYBIND11_MODULE",
+    "body": [
+      "PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {",
+      "\tm.def(\"${1:name}\", &${1:name}, \"${2:docstring}\");",
+      "}"
+    ],
+    "description": "Python bindings (not needed when load_inline gets functions=[...])"
+  },
+  "m_def": {
+    "prefix": [
+      "m_def",
+      "mdef"
+    ],
+    "body": "m.def(\"${1:name}\", &${1:name}, \"${2:docstring}\");",
+    "description": "Bind one function inside PYBIND11_MODULE"
+  }
+}

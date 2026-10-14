@@ -4,12 +4,15 @@ A Zed port of [pytorch-load-inline-highlighter](https://github.com/msaroufim/pyt
 (VS Code). It highlights the C++/CUDA source strings you pass to
 `torch.utils.cpp_extension.load_inline` as C++/CUDA, and adds a CUDA language for `.cu`/`.cuh` files.
 
-The extension provides three things:
+The extension provides four things:
 
 1. **`Python (load_inline)` language**: looks exactly like Zed's built-in Python, but highlights
    matching strings as C++/CUDA.
 2. **`CUDA` language**: used for `.cu`/`.cuh` files and for injected CUDA strings.
-3. **Language servers**: attaches basedpyright and Ruff to `Python (load_inline)` files.
+3. **Snippets**: completion candidates for CUDA built-ins (`threadIdx`, `__syncthreads`,
+   `atomicAdd`, ...) and PyTorch C++ extension idioms (`TORCH_CHECK`, `data_ptr`,
+   `AT_DISPATCH_FLOATING_TYPES`, ...), inside CUDA/C++ strings as well as `.cu`/C++ files.
+4. **Language servers**: attaches basedpyright and Ruff to `Python (load_inline)` files.
 
 Installation, highlighting and language servers were verified on Zed 1.2.6 (macOS, Apple Silicon).
 
@@ -155,6 +158,29 @@ To format and organize imports like built-in Python:
 }
 ```
 
+### 5. When snippet completions appear
+
+Zed offers snippets for every language at the cursor, including an injected one, so the
+completion menu shows them while you type inside a highlighted CUDA/C++ string (rule 2 above) or
+in a `.cu`/C++ file. Inside a string that is *not* highlighted, they do not appear.
+
+| Where the cursor is | Snippets offered |
+| --- | --- |
+| CUDA string, `.cu`/`.cuh` file | CUDA set + PyTorch C++ set |
+| C++ string (`cpp_sources`, `cpp_*`, ...) | PyTorch C++ set |
+| **Any other C++ file in Zed** (`.cpp`, `.h`, ...) | PyTorch C++ set, because Zed keys snippets by language |
+
+Type the beginning of a prefix and pick from the menu; `Tab` moves between the placeholders.
+
+| Set | Prefixes (excerpt) |
+| --- | --- |
+| CUDA | `threadIdx` `blockIdx` `blockDim` `gridDim` (insert `.x`, editable), `idx` (global index), `gsl` (grid-stride loop), `num_blocks`, `kernel`, `__device__`, `__shared__`, `launch`, `launch_stream`, `__syncthreads`, `__syncwarp`, `__shfl_*_sync`, `warp_reduce_sum`, `atomicAdd` / `Max` / `Min` / `Exch` / `CAS`, `__ldg`, `unroll` |
+| PyTorch C++ | `include_torch`, `tensor_fn`, `TORCH_CHECK`, `check_cuda`, `check_contiguous`, `CHECK_INPUT`, `data_ptr`, `accessor`, `empty_like`, `zeros`, `AT_DISPATCH_FLOATING_TYPES(_AND_HALF)`, `current_stream`, `C10_CUDA_KERNEL_LAUNCH_CHECK`, `PYBIND11_MODULE`, `m_def` |
+
+Snippets are a fixed list matched by prefix. They do not know your variables or types; that would
+need a C++ language server (clangd) on the string contents, which Zed does not provide for injected
+code.
+
 ## Troubleshooting
 
 | Symptom | What to check |
@@ -163,6 +189,8 @@ To format and organize imports like built-in Python:
 | Strings look like plain Python strings | Is the status bar language `Python (load_inline)`? → When it works, 1. If so → the rules and the "Not highlighted" table in 2 |
 | `.cu` opens as C++ | Add `"CUDA": ["cu", "cuh"]` to `file_types` |
 | No diagnostics or hover | Restricted Mode? Do `load-inline-*` servers appear in **dev: open language server logs**? |
+| New snippets, languages or servers missing after updating the extension | Zed caches each extension's manifest and does not re-read it on restart. Click **Rebuild** on the Extensions page (with the PATH from Install, step 1) |
+| No snippet completions in a string | Is the string highlighted as CUDA/C++? Snippets follow the highlighting → When it works, 2 and 5 |
 | basedpyright cannot resolve imports | Venv location → the interpreter item in When it works, 4 |
 | Anything else | Command palette → **zed: open log** |
 
@@ -190,14 +218,46 @@ ZED_EXTENSION_CLI=/path/to/zed-extension scripts/check.sh   # plus validation wi
   binary on the same `tree-sitter` crate version Zed links (built with rustup's cargo on first
   run). They can disagree: text predicates on a quantified capture work in py-tree-sitter but had
   no effect in Zed, so trust the Rust result.
+- Snippets: edit `snippets/src/cuda.json` or `snippets/src/torch.json`, then run
+  `python3 scripts/build_snippets.py` to regenerate `snippets/cuda.json` and `snippets/c++.json`
+  (Zed keys snippet files by language name). `tests/test_snippets.py` fails when they are stale.
 - Build `zed-extension` from the Zed repository with `cargo build --release -p extension_cli`.
 - **Do not add `[grammars.python]` to `extension.toml`.** When an extension is unloaded, Zed removes
   every grammar it declared by name, which would also remove the built-in Python grammar.
 
-## Credits and license
+## Credits and inspiration
 
-- `languages/python-load-inline/*.scm`, `languages/cuda/*.scm` and both `config.toml` files are
-  adapted from Zed v1.2.6 `crates/grammars/src/{python,cpp}` (GPL-3.0-or-later), so this extension
-  is GPL-3.0-or-later as well (`LICENSE`).
-- CUDA grammar: [tree-sitter-grammars/tree-sitter-cuda](https://github.com/tree-sitter-grammars/tree-sitter-cuda) (MIT).
-- Detection rules follow [msaroufim/pytorch-load-inline-highlighter](https://github.com/msaroufim/pytorch-load-inline-highlighter).
+This project builds directly on the following work.
+
+- **[msaroufim/pytorch-load-inline-highlighter](https://github.com/msaroufim/pytorch-load-inline-highlighter)**:
+  the VS Code extension this started from. The idea and the detection rules (keyword arguments,
+  variable names, content keywords, HIP as CUDA) come from it.
+- **[Zed](https://github.com/zed-industries/zed)** (v1.2.6):
+  - The Python and C++ query files and language configs are adapted from
+    `crates/grammars/src/{python,cpp}`.
+  - The basedpyright/Ruff wrappers mirror Zed's built-in Python adapters
+    (`crates/languages/src/python.rs`): launch arguments, workspace configuration keys and defaults.
+  - Reading the language registry, syntax map, extension host and snippet provider sources shaped
+    the design (why a separate language, why `[grammars.python]` must not be declared, how
+    injections and snippets are resolved).
+  - The `zed_extension_api` crate and the `extension_cli` tool are used to build and validate the
+    extension.
+- **[d3banjan/zed-cuda](https://github.com/d3banjan/zed-cuda)**: an existing CUDA extension for
+  Zed. Its pinned tree-sitter-cuda revision and its CUDA highlight captures were the starting point
+  for the bundled CUDA language.
+- **[tree-sitter-grammars/tree-sitter-cuda](https://github.com/tree-sitter-grammars/tree-sitter-cuda)**:
+  the CUDA grammar, including its own CUDA highlight query.
+- **[tree-sitter](https://github.com/tree-sitter/tree-sitter)**,
+  **[tree-sitter-python](https://github.com/tree-sitter/tree-sitter-python)** and
+  **[py-tree-sitter](https://github.com/tree-sitter/py-tree-sitter)**: parsing, and the query tests.
+- **[basedpyright](https://github.com/DetachHead/basedpyright)** and
+  **[Ruff](https://github.com/astral-sh/ruff)**: the language servers this extension starts.
+- **[PyTorch](https://github.com/pytorch/pytorch)**: `torch.utils.cpp_extension.load_inline` and the
+  C++ extension API (`TORCH_CHECK`, `AT_DISPATCH_*`, `PYBIND11_MODULE`, ...) that the highlighting
+  and snippets target.
+
+## License
+
+GPL-3.0-or-later (`LICENSE`), because the query files and language configs are adapted from Zed's
+GPL-3.0-or-later sources. The CUDA grammar (tree-sitter-cuda) is MIT and is fetched at build time,
+not vendored.

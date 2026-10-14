@@ -1,0 +1,178 @@
+{
+  "threadIdx": {
+    "prefix": "threadIdx",
+    "body": "threadIdx.${1:x}",
+    "description": "Thread index within the block (x, y, z)"
+  },
+  "blockIdx": {
+    "prefix": "blockIdx",
+    "body": "blockIdx.${1:x}",
+    "description": "Block index within the grid (x, y, z)"
+  },
+  "blockDim": {
+    "prefix": "blockDim",
+    "body": "blockDim.${1:x}",
+    "description": "Threads per block (x, y, z)"
+  },
+  "gridDim": {
+    "prefix": "gridDim",
+    "body": "gridDim.${1:x}",
+    "description": "Blocks per grid (x, y, z)"
+  },
+  "warpSize": {
+    "prefix": "warpSize",
+    "body": "warpSize",
+    "description": "Threads per warp (32)"
+  },
+  "global_idx": {
+    "prefix": ["global_idx", "idx"],
+    "body": "int ${1:idx} = blockIdx.x * blockDim.x + threadIdx.x;",
+    "description": "Global 1D thread index"
+  },
+  "grid_stride_loop": {
+    "prefix": ["grid_stride_loop", "gsl"],
+    "body": [
+      "for (int ${1:i} = blockIdx.x * blockDim.x + threadIdx.x; ${1:i} < ${2:n}; ${1:i} += blockDim.x * gridDim.x) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Grid-stride loop over n elements"
+  },
+  "ceil_div_blocks": {
+    "prefix": ["num_blocks", "ceil_div"],
+    "body": "int ${1:blocks} = (${2:n} + ${3:threads} - 1) / ${3:threads};",
+    "description": "Number of blocks to cover n elements"
+  },
+  "global_kernel": {
+    "prefix": ["__global__", "kernel"],
+    "body": [
+      "__global__ void ${1:kernel}(${2:const float* __restrict__ in, float* __restrict__ out, int n}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Kernel definition"
+  },
+  "device_function": {
+    "prefix": "__device__",
+    "body": [
+      "__device__ __forceinline__ ${1:float} ${2:name}(${3:float x}) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Device function"
+  },
+  "shared_array": {
+    "prefix": "__shared__",
+    "body": "__shared__ ${1:float} ${2:tile}[${3:256}];",
+    "description": "Shared memory array"
+  },
+  "launch_bounds": {
+    "prefix": "__launch_bounds__",
+    "body": "__launch_bounds__(${1:256})",
+    "description": "Max threads per block hint"
+  },
+  "kernel_launch": {
+    "prefix": "launch",
+    "body": "${1:kernel}<<<${2:blocks}, ${3:threads}>>>(${4:args});",
+    "description": "Kernel launch"
+  },
+  "kernel_launch_stream": {
+    "prefix": "launch_stream",
+    "body": "${1:kernel}<<<${2:blocks}, ${3:threads}, ${4:0}, ${5:stream}>>>(${6:args});",
+    "description": "Kernel launch with shared memory and stream"
+  },
+  "syncthreads": {
+    "prefix": "__syncthreads",
+    "body": "__syncthreads();",
+    "description": "Block-wide barrier"
+  },
+  "syncwarp": {
+    "prefix": "__syncwarp",
+    "body": "__syncwarp(${1:0xffffffff});",
+    "description": "Warp-wide barrier"
+  },
+  "shfl_sync": {
+    "prefix": "__shfl_sync",
+    "body": "__shfl_sync(${1:0xffffffff}, ${2:val}, ${3:src_lane})",
+    "description": "Read a value from another lane"
+  },
+  "shfl_down_sync": {
+    "prefix": "__shfl_down_sync",
+    "body": "__shfl_down_sync(${1:0xffffffff}, ${2:val}, ${3:offset})",
+    "description": "Read from lane + offset"
+  },
+  "shfl_up_sync": {
+    "prefix": "__shfl_up_sync",
+    "body": "__shfl_up_sync(${1:0xffffffff}, ${2:val}, ${3:offset})",
+    "description": "Read from lane - offset"
+  },
+  "shfl_xor_sync": {
+    "prefix": "__shfl_xor_sync",
+    "body": "__shfl_xor_sync(${1:0xffffffff}, ${2:val}, ${3:lane_mask})",
+    "description": "Butterfly exchange across lanes"
+  },
+  "ballot_sync": {
+    "prefix": "__ballot_sync",
+    "body": "__ballot_sync(${1:0xffffffff}, ${2:predicate})",
+    "description": "Bitmask of lanes where predicate is true"
+  },
+  "warp_reduce_sum": {
+    "prefix": "warp_reduce_sum",
+    "body": [
+      "for (int offset = warpSize / 2; offset > 0; offset /= 2) {",
+      "\t${1:val} += __shfl_down_sync(0xffffffff, ${1:val}, offset);",
+      "}"
+    ],
+    "description": "Warp-level sum reduction"
+  },
+  "atomicAdd": {
+    "prefix": "atomicAdd",
+    "body": "atomicAdd(${1:&addr}, ${2:val})",
+    "description": "Atomic add, returns old value"
+  },
+  "atomicMax": {
+    "prefix": "atomicMax",
+    "body": "atomicMax(${1:&addr}, ${2:val})",
+    "description": "Atomic max (integer types)"
+  },
+  "atomicMin": {
+    "prefix": "atomicMin",
+    "body": "atomicMin(${1:&addr}, ${2:val})",
+    "description": "Atomic min (integer types)"
+  },
+  "atomicExch": {
+    "prefix": "atomicExch",
+    "body": "atomicExch(${1:&addr}, ${2:val})",
+    "description": "Atomic exchange"
+  },
+  "atomicCAS": {
+    "prefix": "atomicCAS",
+    "body": "atomicCAS(${1:&addr}, ${2:compare}, ${3:val})",
+    "description": "Atomic compare-and-swap"
+  },
+  "ldg": {
+    "prefix": "__ldg",
+    "body": "__ldg(${1:ptr})",
+    "description": "Load through the read-only data cache"
+  },
+  "pragma_unroll": {
+    "prefix": ["pragma_unroll", "unroll"],
+    "body": "#pragma unroll",
+    "description": "Unroll the following loop"
+  },
+  "include_cuda_runtime": {
+    "prefix": "include_cuda_runtime",
+    "body": "#include <cuda_runtime.h>",
+    "description": "CUDA runtime header"
+  },
+  "cudaDeviceSynchronize": {
+    "prefix": "cudaDeviceSynchronize",
+    "body": "cudaDeviceSynchronize();",
+    "description": "Wait for the device to finish"
+  },
+  "cudaGetLastError": {
+    "prefix": "cudaGetLastError",
+    "body": "cudaGetLastError()",
+    "description": "Last runtime error, resets it"
+  }
+}

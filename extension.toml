@@ -5,6 +5,10 @@ schema_version = 1
 authors = ["Jun Park <pj2417@gmail.com>"]
 description = "Highlights C++/CUDA sources embedded in Python strings for torch.utils.cpp_extension.load_inline, and adds a CUDA language."
 
+# Generated from snippets/src/ by scripts/build_snippets.py. Zed keys snippet
+# files by language: cuda.json -> CUDA, c++.json -> C++ (every C++ file).
+snippets = ["snippets/cuda.json", "snippets/c++.json"]
+
 # The Python language in this extension reuses Zed's native `python` grammar.
 # Do NOT declare [grammars.python] here: when an extension is unloaded Zed drops
 # every grammar it declared by name, which would take the native one with it.
