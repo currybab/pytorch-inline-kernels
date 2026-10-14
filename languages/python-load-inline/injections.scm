@@ -27,11 +27,14 @@
 
 ; load_inline ---------------------------------------------------------------------
 ; C++/CUDA sources embedded in Python strings, for
-; torch.utils.cpp_extension.load_inline. HIP sources are highlighted as CUDA.
+; torch.utils.cpp_extension.load_inline. HIP sources (by variable name or marker
+; comment) are highlighted as CUDA; SYCL sources are C++.
 ;
 ; The rules are mutually exclusive: Zed creates one syntax layer per match and
 ; does not deduplicate across patterns. Precedence, highest first:
-;   1. keyword argument name   cpp_sources= / cuda_sources= / hip_sources=
+;   1. keyword argument name   cuda_sources= -> cuda, cpp_sources= / sycl_sources= -> cpp
+;                              (load_inline has no hip_sources=; ROCm builds of
+;                              PyTorch hipify cuda_sources)
 ;   2. variable name           cuda_* hip_* kernel_code *_cuda *_cu *_hip *_kernel -> cuda
 ;                              cpp_* *_cpp                                        -> cpp
 ;                              (case-insensitive; a cuda_/hip_/cpp_ prefix beats any suffix)
@@ -69,7 +72,7 @@
     (list (string ((string_content) @injection.content (interpolation)*)+))
     (tuple (string ((string_content) @injection.content (interpolation)*)+))
   ]
-  (#match? @_kw "^(cuda|hip)_sources$")
+  (#eq? @_kw "cuda_sources")
   (#set! injection.language "cuda"))
 
 (keyword_argument
@@ -79,7 +82,7 @@
     (list (string ((string_content) @injection.content (interpolation)*)+))
     (tuple (string ((string_content) @injection.content (interpolation)*)+))
   ]
-  (#eq? @_kw "cpp_sources")
+  (#any-of? @_kw "cpp_sources" "sycl_sources")
   (#set! injection.language "cpp"))
 
 ; 2. variable names (plain or attribute targets, annotated or not).

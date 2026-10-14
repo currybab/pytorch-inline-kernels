@@ -73,7 +73,7 @@ first match applies, so a string is never highlighted twice.
 
 | Priority | Rule | Highlighted as CUDA | Highlighted as C++ |
 | --- | --- | --- | --- |
-| 1 | Keyword argument name (in any call) | `cuda_sources=`, `hip_sources=` | `cpp_sources=` |
+| 1 | Keyword argument name (in any call) | `cuda_sources=` | `cpp_sources=`, `sycl_sources=` |
 | 2 | Assigned variable name (case-insensitive, so `CUDA_SRC` counts) | `cuda_*`, `hip_*`, `kernel_code`, `*_cuda`, `*_cu`, `*_hip`, `*_kernel` | `cpp_*`, `*_cpp` |
 | 3 | Content of the assigned string | contains `__global__` `__device__` `__host__` `threadIdx` `blockIdx` `blockDim` `gridDim` | contains `torch::Tensor` or `#include <torch/...>` |
 | 4 | Marker comment above the assignment | `# cuda`, `# hip`, `# language=cuda`, `# lang: cuda` | `# cpp`, `# c++`, `# language=cpp` |
@@ -97,7 +97,11 @@ first match applies, so a string is never highlighted twice.
 - Plain strings, `r"..."`, `b"..."` and triple-quoted strings all work.
 - In f-strings (`f"""... {BLOCK} ..."""`), the `{...}` parts stay Python and the remaining pieces
   are highlighted together as one C++/CUDA document.
-- HIP sources are highlighted with the CUDA grammar.
+- HIP (AMD ROCm) sources, found by a `hip` variable name or a `# hip` marker, are highlighted with
+  the CUDA grammar, which shares their syntax. HIP runtime APIs (`hipMalloc`, ...) are not
+  highlighted as built-ins. `load_inline` itself has no `hip_sources=`: ROCm builds of PyTorch
+  convert `cuda_sources` to HIP automatically.
+- SYCL sources (`sycl_sources=`) are C++ and highlighted as such.
 
 **Not highlighted** (verified examples):
 
@@ -108,7 +112,7 @@ first match applies, so a string is never highlighted twice.
 | `cuda_sources=textwrap.dedent("...")` | Rule 1 takes strings and lists/tuples of strings only | Assign it to a variable first |
 | `{"cuda": "__global__ ..."}`, `return "__global__ ..."` | Not an assignment | Assign it to a variable first |
 | `load_inline("m", "torch::Tensor f();")` | Positional arguments have no name | Use a keyword argument or a variable |
-| `load_inline(cuda_src="...")` | Only `*_sources` keyword arguments count | — |
+| `load_inline(cuda_src="...")`, `hip_sources="..."` | Only `load_inline`'s own source arguments count (`hip_sources` is not one) | — |
 | `a_src, b_src = "...", "..."` | Multiple targets in one assignment | One assignment per line |
 | Docstrings, `print("__global__")` | Rule 3 only looks at assignments, to avoid false positives | — |
 
@@ -268,7 +272,8 @@ This project builds directly on the following work.
 
 - **[msaroufim/pytorch-load-inline-highlighter](https://github.com/msaroufim/pytorch-load-inline-highlighter)**:
   the VS Code extension this started from. The idea and the detection rules (keyword arguments,
-  variable names, content keywords, HIP as CUDA) come from it.
+  variable names, content keywords, HIP as CUDA) come from it, except `hip_sources=`, which
+  `load_inline` does not accept.
 - **[Zed](https://github.com/zed-industries/zed)** (v1.23.3):
   - The Python and C++ query files and language configs are adapted from
     `crates/grammars/src/{python,cpp}`.

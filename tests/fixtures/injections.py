@@ -21,8 +21,18 @@ load_inline(
     name="kw_list",
     cpp_sources=["// EXPECT:cpp", "// EXPECT:cpp"],
     cuda_sources=("// EXPECT:cuda",),
-    hip_sources=["// EXPECT:cuda"],
+    sycl_sources=["// EXPECT:cpp"],
     functions=["// EXPECT:none"],
+)
+
+load_inline(
+    name="kw_sycl_string",
+    cpp_sources="// EXPECT:cpp",
+    sycl_sources="""// EXPECT:cpp
+sycl::queue q;
+""",
+    # Not a load_inline argument; ROCm builds hipify cuda_sources instead.
+    hip_sources="// EXPECT:none",
 )
 
 # --- variable names (cuda) ---------------------------------------------------
