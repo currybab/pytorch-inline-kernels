@@ -1,0 +1,6 @@
+target/
+tests/.cache/
+__pycache__/
+.pytest_cache/
+extension.wasm
+grammars/
