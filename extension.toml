@@ -3,15 +3,22 @@ name = "PyTorch Inline Kernels"
 version = "0.1.0"
 schema_version = 1
 authors = ["Jun Park <pj2417@gmail.com>"]
+repository = "https://github.com/currybab/pytorch-inline-kernels"
 description = "C++/CUDA kernels written inline in Python for PyTorch (load_inline): highlighting, CUDA language, CUDA and PyTorch C++ snippets, and Python language servers."
 
 # Generated from snippets/src/ by scripts/build_snippets.py. Zed keys snippet
 # files by language: cuda.json -> CUDA, c++.json -> C++ (every C++ file).
 snippets = ["snippets/cuda.json", "snippets/c++.json"]
 
-# The Python language in this extension reuses Zed's native `python` grammar.
-# Do NOT declare [grammars.python] here: when an extension is unloaded Zed drops
-# every grammar it declared by name, which would take the native one with it.
+# "Python (load_inline)" uses the python grammar, and the registry requires
+# every grammar a language uses to be declared. Zed 1.21+ keeps its native
+# python grammar and ignores this one; older Zed replaces the native grammar
+# with this copy while the extension is installed. Keep it on the release Zed
+# links (tree-sitter-python 0.25.0, tag v0.25.0) so both cases parse the same;
+# tests/test_manifest.py checks the version.
+[grammars.python]
+repository = "https://github.com/tree-sitter/tree-sitter-python"
+rev = "293fdc02038ee2bf0e2e206711b69c90ac0d413f"
 
 [grammars.cuda]
 repository = "https://github.com/tree-sitter-grammars/tree-sitter-cuda"
@@ -20,10 +27,18 @@ rev = "48b066f334f4cf2174e05a50218ce2ed98b6fd01"
 # Zed's own Python language servers are bound to the built-in "Python" language,
 # so this extension provides wrappers for "Python (load_inline)". The ids differ
 # from Zed's ("basedpyright", "ruff") because server names are global.
+# language_ids: Zed would otherwise send the lowercased language name,
+# "python (load_inline)", as the LSP languageId.
 [language_servers.load-inline-basedpyright]
 name = "basedpyright (load_inline)"
 languages = ["Python (load_inline)"]
 
+[language_servers.load-inline-basedpyright.language_ids]
+"Python (load_inline)" = "python"
+
 [language_servers.load-inline-ruff]
 name = "Ruff (load_inline)"
 languages = ["Python (load_inline)"]
+
+[language_servers.load-inline-ruff.language_ids]
+"Python (load_inline)" = "python"

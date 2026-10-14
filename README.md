@@ -15,15 +15,15 @@ The extension provides four things:
    `AT_DISPATCH_FLOATING_TYPES`, ...), inside CUDA/C++ strings as well as `.cu`/C++ files.
 4. **Language servers**: attaches basedpyright and Ruff to `Python (load_inline)` files.
 
-Installation, highlighting and language servers were verified on Zed 1.2.6 (macOS, Apple Silicon).
+Installation, highlighting and language servers were verified on Zed 1.23.3 (macOS, Apple Silicon).
 
 ## Requirements
 
 | Item | When needed | Notes |
 | --- | --- | --- |
-| Zed (with extension API 0.7.0) | Always | Verified on 1.2.6 |
+| Zed (with extension API 0.7.0) | Always | Verified on 1.23.3 |
 | Rust installed via rustup | Only when installing or rebuilding | Homebrew `rust` cannot build it (see Install, step 1) |
-| Network access | First install | Downloads wasi-sdk, tree-sitter-cuda and, if needed, basedpyright/ruff |
+| Network access | First install | Downloads wasi-sdk, tree-sitter-python, tree-sitter-cuda and, if needed, basedpyright/ruff |
 | Node.js | When basedpyright is auto-installed | Zed uses `node` from PATH or downloads its own |
 | NVIDIA GPU, CUDA Toolkit | **Not needed** | Highlighting only, so it works on macOS too |
 
@@ -45,7 +45,8 @@ Installation, highlighting and language servers were verified on Zed 1.2.6 (macO
 
 After the first install, Zed launched normally (Dock etc.) keeps working. Step 1 only matters again
 when you **Rebuild** or reinstall the extension from the Extensions page. To remove it, use
-**Uninstall** on the Extensions page (⌘⇧X).
+**Uninstall** on the Extensions page (⌘⇧X). On Zed 1.20 or older, restart Zed afterwards (see
+[Effect on built-in Python](#effect-on-built-in-python)).
 
 ## When it works
 
@@ -210,6 +211,7 @@ code.
 | New snippets, languages or servers missing after updating the extension | Zed caches each extension's manifest and does not re-read it on restart. Click **Rebuild** on the Extensions page (with the PATH from Install, step 1) |
 | No snippet completions in a string | Is the string highlighted as CUDA/C++? Snippets follow the highlighting → When it works, 2 and 5 |
 | basedpyright cannot resolve imports | Venv location → the interpreter item in When it works, 4 |
+| Regular Python files lost highlighting after uninstalling (Zed 1.20 or older) | Restart Zed → [Effect on built-in Python](#effect-on-built-in-python) |
 | Anything else | Command palette → **zed: open log** |
 
 ## Why a separate language
@@ -221,6 +223,20 @@ copies Zed's built-in Python queries into a separate `Python (load_inline)` lang
 rules there. Zed's Python language servers are also bound to "Python" only, so the extension starts
 the same servers for its own language.
 
+### Effect on built-in Python
+
+`Python (load_inline)` parses with tree-sitter-python, and Zed requires an extension to declare
+every grammar its languages use, so `extension.toml` declares `[grammars.python]`. Zed keys
+grammars by name:
+
+- **Zed 1.21 and later** keep their native `python` grammar and skip the extension's copy (the log
+  shows `not registering extension grammar python`). Built-in Python is unaffected, and both
+  languages use the native grammar.
+- **Zed 1.20 and older** replace the native grammar with the extension's copy while it is
+  installed. The copy is pinned to the release Zed links (tree-sitter-python 0.25.0), so parsing is
+  the same, but it runs as WebAssembly. Uninstalling removes the `python` grammar from the running
+  Zed, so regular Python files lose highlighting until Zed restarts.
+
 ## Development
 
 ```sh
@@ -229,19 +245,22 @@ ZED_EXTENSION_CLI=/path/to/zed-extension scripts/check.sh   # plus validation wi
 ```
 
 - Query tests (`tests/`, pytest) check that every `.scm` compiles against the real grammars
-  (tree-sitter-python 0.25 and the tree-sitter-cuda revision pinned in `extension.toml`), and that
+  (built from the tree-sitter-python and tree-sitter-cuda revisions pinned in `extension.toml`), and that
   strings in `tests/fixtures/injections.py` are injected exactly once, as their `EXPECT:<lang>`
   markers say. When changing a rule, add an example to the fixture first.
 - The injection fixture runs on two engines: py-tree-sitter and `tests/query_runner`, a small Rust
-  binary on the same `tree-sitter` crate version Zed links (built with rustup's cargo on first
-  run). They can disagree: text predicates on a quantified capture work in py-tree-sitter but had
+  binary on the same `tree-sitter` crate version Zed links (0.27.0 in Zed 1.23.3; built with
+  rustup's cargo on first run). They can disagree: text predicates on a quantified capture work in py-tree-sitter but had
   no effect in Zed, so trust the Rust result.
 - Snippets: edit `snippets/src/cuda.json` or `snippets/src/torch.json`, then run
   `python3 scripts/build_snippets.py` to regenerate `snippets/cuda.json` and `snippets/c++.json`
   (Zed keys snippet files by language name). `tests/test_snippets.py` fails when they are stale.
 - Build `zed-extension` from the Zed repository with `cargo build --release -p extension_cli`.
-- **Do not add `[grammars.python]` to `extension.toml`.** When an extension is unloaded, Zed removes
-  every grammar it declared by name, which would also remove the built-in Python grammar.
+- **Keep the pinned grammars and tree-sitter in step with Zed** (see
+  [Effect on built-in Python](#effect-on-built-in-python)). When Zed moves to a newer
+  tree-sitter or tree-sitter-python, update `[grammars.python]`, `tests/query_runner/Cargo.toml`
+  and the versions in `tests/test_manifest.py` together. The Python query files are copies of
+  Zed's (`crates/grammars/src/python`); re-copy them when Zed changes them.
 
 ## Credits and inspiration
 
@@ -250,14 +269,14 @@ This project builds directly on the following work.
 - **[msaroufim/pytorch-load-inline-highlighter](https://github.com/msaroufim/pytorch-load-inline-highlighter)**:
   the VS Code extension this started from. The idea and the detection rules (keyword arguments,
   variable names, content keywords, HIP as CUDA) come from it.
-- **[Zed](https://github.com/zed-industries/zed)** (v1.2.6):
+- **[Zed](https://github.com/zed-industries/zed)** (v1.23.3):
   - The Python and C++ query files and language configs are adapted from
     `crates/grammars/src/{python,cpp}`.
   - The basedpyright/Ruff wrappers mirror Zed's built-in Python adapters
     (`crates/languages/src/python.rs`): launch arguments, workspace configuration keys and defaults.
   - Reading the language registry, syntax map, extension host and snippet provider sources shaped
-    the design (why a separate language, why `[grammars.python]` must not be declared, how
-    injections and snippets are resolved).
+    the design (why a separate language, what declaring the `python` grammar does to built-in
+    Python, how injections and snippets are resolved).
   - The `zed_extension_api` crate and the `extension_cli` tool are used to build and validate the
     extension.
 - **[d3banjan/zed-cuda](https://github.com/d3banjan/zed-cuda)**: an existing CUDA extension for
@@ -277,5 +296,5 @@ This project builds directly on the following work.
 ## License
 
 GPL-3.0-or-later (`LICENSE`), because the query files and language configs are adapted from Zed's
-GPL-3.0-or-later sources. The CUDA grammar (tree-sitter-cuda) is MIT and is fetched at build time,
-not vendored.
+GPL-3.0-or-later sources. The grammars (tree-sitter-python and tree-sitter-cuda) are MIT and are
+fetched at build time, not vendored.

@@ -1,9 +1,8 @@
 """Shared grammar loading for the query tests.
 
-The Python grammar comes from the `tree-sitter-python` wheel, pinned to the
-same minor version Zed links natively. The CUDA grammar is built from the exact
-repository and revision pinned in `extension.toml`, so the tests exercise the
-grammar Zed will compile for the extension.
+Both grammars are built from the exact repository and revision pinned in
+`extension.toml`, so the tests exercise the grammars Zed compiles for the
+extension.
 """
 
 from __future__ import annotations
@@ -17,7 +16,6 @@ import tomllib
 from pathlib import Path
 
 import pytest
-import tree_sitter_python
 from tree_sitter import Language
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -95,7 +93,7 @@ def query_runner() -> Path:
 
 @pytest.fixture(scope="session")
 def python_language() -> Language:
-    return Language(tree_sitter_python.language())
+    return build_grammar("python")
 
 
 @pytest.fixture(scope="session")

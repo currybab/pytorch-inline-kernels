@@ -13,14 +13,14 @@
     arguments: (argument_list
       (comment) @_comment
       (string
-        (string_content) @injection.content)))
+        (string_content) @injection.content) @injection.host))
   ; string variables
   ((comment) @_comment
     .
     (expression_statement
       (assignment
         right: (string
-          (string_content) @injection.content))))
+          (string_content) @injection.content) @injection.host)))
 ]
   (#match? @_comment "^(#|#\\s+)(?i:sql)\\s*$")
   (#set! injection.language "sql"))
@@ -47,7 +47,7 @@
 ; captures them: a predicate on a capture with no nodes passes.
 ;
 ; Content checks use `@_str`, the whole string node, never the quantified
-; `@injection.content`: Zed's Rust tree-sitter (0.26.8) returns true from
+; `@injection.content`: Zed's Rust tree-sitter (0.27.0 in Zed 1.23.3) returns true from
 ; `#any-match?` when no node matches, so the content rules matched every
 ; string. tests/query_runner runs the fixture on that engine.
 ;
