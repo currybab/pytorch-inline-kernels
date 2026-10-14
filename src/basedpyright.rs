@@ -97,9 +97,7 @@ fn install_latest(id: &LanguageServerId) -> zed::Result<()> {
 }
 
 pub fn initialization_options(worktree: &Worktree) -> zed::Result<Option<Value>> {
-    let user = IDS
-        .lsp_settings(worktree)?
-        .and_then(|s| s.initialization_options);
+    let user = IDS.initialization_options(worktree)?;
     Ok(Some(user.unwrap_or_else(|| {
         zed::serde_json::json!({
             "python": {
@@ -114,7 +112,7 @@ pub fn initialization_options(worktree: &Worktree) -> zed::Result<Option<Value>>
 }
 
 pub fn workspace_configuration(worktree: &Worktree) -> zed::Result<Option<Value>> {
-    let user = IDS.lsp_settings(worktree)?.and_then(|s| s.settings);
+    let user = IDS.settings(worktree)?;
     let venv = detect_venv(worktree);
     Ok(Some(basedpyright_workspace_config(
         user.as_ref(),

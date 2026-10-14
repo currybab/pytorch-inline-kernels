@@ -2,13 +2,15 @@
 
 use zed_extension_api::{
     self as zed,
+    serde_json::Value,
     settings::{CommandSettings, LspSettings},
     EnvVars, Worktree,
 };
 
 /// A wrapper's own server id plus the built-in server it stands in for.
-/// User settings are read from `lsp.<own>` first, then `lsp.<builtin>`, so a
-/// configuration written for Zed's Python setup carries over unchanged.
+/// Each setting is read from `lsp.<own>` first, then `lsp.<builtin>`, field by
+/// field, so a configuration written for Zed's Python setup carries over and
+/// can be partly overridden under the wrapper's id.
 #[derive(Debug, Clone, Copy)]
 pub struct ServerIds {
     pub own: &'static str,
@@ -16,33 +18,49 @@ pub struct ServerIds {
 }
 
 impl ServerIds {
-    pub fn lsp_settings(&self, worktree: &Worktree) -> zed::Result<Option<LspSettings>> {
-        self.first_matching(worktree, |s| {
-            s.settings.is_some() || s.initialization_options.is_some()
-        })
+    /// `lsp.<id>.settings`.
+    pub fn settings(&self, worktree: &Worktree) -> zed::Result<Option<Value>> {
+        self.first_set(worktree, |s| s.settings)
+    }
+
+    /// `lsp.<id>.initialization_options`.
+    pub fn initialization_options(&self, worktree: &Worktree) -> zed::Result<Option<Value>> {
+        self.first_set(worktree, |s| s.initialization_options)
     }
 
     /// `lsp.<id>.binary`, when the user set a `path` for it.
     pub fn binary_override(&self, worktree: &Worktree) -> zed::Result<Option<CommandSettings>> {
-        let settings = self.first_matching(worktree, |s| {
-            s.binary.as_ref().is_some_and(|b| b.path.is_some())
-        })?;
-        Ok(settings.and_then(|s| s.binary))
+        self.first_set(worktree, binary_with_path)
     }
 
-    fn first_matching(
+    fn first_set<T>(
         &self,
         worktree: &Worktree,
-        matches: impl Fn(&LspSettings) -> bool,
-    ) -> zed::Result<Option<LspSettings>> {
-        for server_id in [self.own, self.builtin] {
-            let settings = LspSettings::for_worktree(server_id, worktree)?;
-            if matches(&settings) {
-                return Ok(Some(settings));
-            }
-        }
-        Ok(None)
+        field: impl Fn(LspSettings) -> Option<T>,
+    ) -> zed::Result<Option<T>> {
+        let candidates = [self.own, self.builtin]
+            .into_iter()
+            .map(|server_id| LspSettings::for_worktree(server_id, worktree));
+        first_set_field(candidates, field)
     }
+}
+
+fn binary_with_path(settings: LspSettings) -> Option<CommandSettings> {
+    settings.binary.filter(|binary| binary.path.is_some())
+}
+
+/// Returns `field` of the first candidate that sets it. Candidates are looked
+/// up lazily, so later ids are not read once a value is found.
+fn first_set_field<T>(
+    candidates: impl IntoIterator<Item = zed::Result<LspSettings>>,
+    field: impl Fn(LspSettings) -> Option<T>,
+) -> zed::Result<Option<T>> {
+    for candidate in candidates {
+        if let Some(value) = field(candidate?) {
+            return Ok(Some(value));
+        }
+    }
+    Ok(None)
 }
 
 /// Builds the command for a user-provided `binary` setting. The user's
@@ -81,7 +99,84 @@ pub fn absolute_path(relative: &str) -> zed::Result<String> {
 mod tests {
     use std::collections::HashMap;
 
+    use zed_extension_api::serde_json::json;
+
     use super::*;
+
+    fn lsp(
+        settings: Option<Value>,
+        init: Option<Value>,
+        binary: Option<CommandSettings>,
+    ) -> LspSettings {
+        LspSettings {
+            binary,
+            initialization_options: init,
+            settings,
+        }
+    }
+
+    fn binary(path: Option<&str>) -> CommandSettings {
+        CommandSettings {
+            path: path.map(str::to_owned),
+            arguments: None,
+            env: None,
+        }
+    }
+
+    #[test]
+    fn each_field_comes_from_the_first_id_that_sets_it() {
+        let candidates = || {
+            [
+                Ok(lsp(Some(json!({"own": 1})), None, None)),
+                Ok(lsp(
+                    Some(json!({"builtin": 1})),
+                    Some(json!({"init": 1})),
+                    None,
+                )),
+            ]
+        };
+
+        let settings = first_set_field(candidates(), |s| s.settings).unwrap();
+        let init = first_set_field(candidates(), |s| s.initialization_options).unwrap();
+
+        assert_eq!(settings, Some(json!({"own": 1})));
+        assert_eq!(init, Some(json!({"init": 1})));
+    }
+
+    #[test]
+    fn binary_without_path_falls_through_to_the_next_id() {
+        let own = lsp(None, None, Some(binary(None)));
+        let builtin = lsp(None, None, Some(binary(Some("/opt/bin/ruff"))));
+
+        let found = first_set_field([Ok(own), Ok(builtin)], binary_with_path).unwrap();
+
+        assert_eq!(found.and_then(|b| b.path), Some("/opt/bin/ruff".to_owned()));
+    }
+
+    #[test]
+    fn nothing_set_gives_none() {
+        let found = first_set_field([Ok(lsp(None, None, None))], |s| s.settings).unwrap();
+        assert_eq!(found, None);
+    }
+
+    #[test]
+    fn later_ids_are_not_read_once_a_value_is_found() {
+        let own = lsp(Some(json!({"own": 1})), None, None);
+        let candidates = [Ok(own), Err("lookup failed".to_owned())];
+        assert_eq!(
+            first_set_field(candidates, |s| s.settings),
+            Ok(Some(json!({"own": 1})))
+        );
+    }
+
+    #[test]
+    fn lookup_errors_are_returned() {
+        let candidates = [Err("lookup failed".to_owned())];
+        assert_eq!(
+            first_set_field(candidates, |s| s.settings),
+            Err("lookup failed".to_owned())
+        );
+    }
 
     fn env(pairs: &[(&str, &str)]) -> EnvVars {
         pairs

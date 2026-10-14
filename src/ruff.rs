@@ -185,13 +185,11 @@ fn remove_downloads_except(current: &str) {
 }
 
 pub fn initialization_options(worktree: &Worktree) -> zed::Result<Option<Value>> {
-    Ok(IDS
-        .lsp_settings(worktree)?
-        .and_then(|s| s.initialization_options))
+    IDS.initialization_options(worktree)
 }
 
 pub fn workspace_configuration(worktree: &Worktree) -> zed::Result<Option<Value>> {
-    Ok(IDS.lsp_settings(worktree)?.and_then(|s| s.settings))
+    IDS.settings(worktree)
 }
 
 #[cfg(test)]
