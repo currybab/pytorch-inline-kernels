@@ -34,7 +34,7 @@
 ;   1. keyword argument name   cpp_sources= / cuda_sources= / hip_sources=
 ;   2. variable name           cuda_* hip_* kernel_code *_cuda *_cu *_hip *_kernel -> cuda
 ;                              cpp_* *_cpp                                        -> cpp
-;                              (a cuda_/hip_/cpp_ prefix beats any suffix)
+;                              (case-insensitive; a cuda_/hip_/cpp_ prefix beats any suffix)
 ;   3. content                 __global__, threadIdx, ...   -> cuda
 ;                              torch::Tensor, <torch/...>   -> cpp
 ;   4. marker comment          `# cuda`, `# cpp`, `# language=cuda` on the line above
@@ -71,7 +71,7 @@
     (attribute attribute: (identifier) @_name)
   ]
   right: (string [(string_content) @injection.content (interpolation)]+)
-  (#match? @_name "^((cuda|hip)_|kernel_code$)")
+  (#match? @_name "(?i)^((cuda|hip)_|kernel_code$)")
   (#set! injection.language "cuda"))
 
 (assignment
@@ -80,8 +80,8 @@
     (attribute attribute: (identifier) @_name)
   ]
   right: (string [(string_content) @injection.content (interpolation)]+)
-  (#match? @_name "_(cuda|cu|hip|kernel)$")
-  (#not-match? @_name "^(cuda|hip|cpp)_")
+  (#match? @_name "(?i)_(cuda|cu|hip|kernel)$")
+  (#not-match? @_name "(?i)^(cuda|hip|cpp)_")
   (#set! injection.language "cuda"))
 
 (assignment
@@ -90,7 +90,7 @@
     (attribute attribute: (identifier) @_name)
   ]
   right: (string [(string_content) @injection.content (interpolation)]+)
-  (#match? @_name "^cpp_")
+  (#match? @_name "(?i)^cpp_")
   (#set! injection.language "cpp"))
 
 (assignment
@@ -99,8 +99,8 @@
     (attribute attribute: (identifier) @_name)
   ]
   right: (string [(string_content) @injection.content (interpolation)]+)
-  (#match? @_name "_cpp$")
-  (#not-match? @_name "^(cuda|hip|cpp)_")
+  (#match? @_name "(?i)_cpp$")
+  (#not-match? @_name "(?i)^(cuda|hip|cpp)_")
   (#set! injection.language "cpp"))
 
 ; 3. content, for assignments whose name did not decide already.
@@ -110,7 +110,7 @@
     (attribute attribute: (identifier) @_name)
   ]
   right: (string [(string_content) @injection.content (interpolation)]+)
-  (#not-match? @_name "^(cuda|hip|cpp)_|_(cuda|cu|hip|kernel|cpp)$|^kernel_code$")
+  (#not-match? @_name "(?i)^(cuda|hip|cpp)_|_(cuda|cu|hip|kernel|cpp)$|^kernel_code$")
   (#any-match? @injection.content "__(global|device|host)__|\\b(blockIdx|threadIdx|blockDim|gridDim)\\b")
   (#set! injection.language "cuda"))
 
@@ -120,7 +120,7 @@
     (attribute attribute: (identifier) @_name)
   ]
   right: (string [(string_content) @injection.content (interpolation)]+)
-  (#not-match? @_name "^(cuda|hip|cpp)_|_(cuda|cu|hip|kernel|cpp)$|^kernel_code$")
+  (#not-match? @_name "(?i)^(cuda|hip|cpp)_|_(cuda|cu|hip|kernel|cpp)$|^kernel_code$")
   (#not-match? @injection.content "__(global|device|host)__|\\b(blockIdx|threadIdx|blockDim|gridDim)\\b")
   (#any-match? @injection.content "torch::Tensor|#include\\s*<torch/")
   (#set! injection.language "cpp"))
@@ -136,7 +136,7 @@
       ]
       right: (string [(string_content) @injection.content (interpolation)]+)))
   (#match? @_comment "^#\\s*((language|lang)\\s*[=:]\\s*)?(?i:cuda|hip)\\s*$")
-  (#not-match? @_name "^(cuda|hip|cpp)_|_(cuda|cu|hip|kernel|cpp)$|^kernel_code$")
+  (#not-match? @_name "(?i)^(cuda|hip|cpp)_|_(cuda|cu|hip|kernel|cpp)$|^kernel_code$")
   (#not-match? @injection.content "__(global|device|host)__|\\b(blockIdx|threadIdx|blockDim|gridDim)\\b|torch::Tensor|#include\\s*<torch/")
   (#set! injection.language "cuda"))
 
@@ -150,6 +150,6 @@
       ]
       right: (string [(string_content) @injection.content (interpolation)]+)))
   (#match? @_comment "^#\\s*((language|lang)\\s*[=:]\\s*)?(?i:cpp|c\\+\\+)\\s*$")
-  (#not-match? @_name "^(cuda|hip|cpp)_|_(cuda|cu|hip|kernel|cpp)$|^kernel_code$")
+  (#not-match? @_name "(?i)^(cuda|hip|cpp)_|_(cuda|cu|hip|kernel|cpp)$|^kernel_code$")
   (#not-match? @injection.content "__(global|device|host)__|\\b(blockIdx|threadIdx|blockDim|gridDim)\\b|torch::Tensor|#include\\s*<torch/")
   (#set! injection.language "cpp"))

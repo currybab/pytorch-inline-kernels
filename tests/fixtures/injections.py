@@ -45,6 +45,16 @@ binding_cpp = "// EXPECT:cpp"
 cpp_kernel = "// EXPECT:cpp"
 self_like.cpp_source = "// EXPECT:cpp"
 
+# --- variable names are case-insensitive ---------------------------------------
+
+CUDA_SRC = "// EXPECT:cuda"
+ADD_KERNEL = "// EXPECT:cuda"
+Hip_Source = "// EXPECT:cuda"
+CPP_SOURCE = "// EXPECT:cpp"
+Binding_Cpp = "// EXPECT:cpp"
+CPP_KERNEL = "// EXPECT:cpp"
+GREETING = "hello // EXPECT:none"
+
 # --- marker comments ---------------------------------------------------------
 
 # cuda

@@ -25,7 +25,8 @@ if [[ -n "${ZED_EXTENSION_CLI:-}" ]]; then
     work="$(mktemp -d)"
     trap 'rm -rf "$work"' EXIT
     mkdir -p "$work/out" "$work/scratch"
-    rsync -a --exclude target --exclude tests --exclude .git "$root/" "$work/src/"
+    rsync -a --exclude target --exclude tests --exclude .git --exclude grammars \
+        --exclude extension.wasm "$root/" "$work/src/"
     # The CLI insists every grammar a language uses is declared; the real
     # manifest must not declare `python` (see extension.toml), so add it only
     # to this throwaway copy. Pinned to the tree-sitter-python Zed links (0.25).
