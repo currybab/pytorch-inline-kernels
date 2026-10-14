@@ -1,66 +1,148 @@
 # PyTorch load_inline for Zed
 
-[pytorch-load-inline-highlighter](https://github.com/msaroufim/pytorch-load-inline-highlighter)(VS Code)를
-Zed로 옮긴 확장입니다. `torch.utils.cpp_extension.load_inline`에 넘기는 C++/CUDA 소스 문자열을
-C++/CUDA 문법으로 하이라이트하고, `.cu`/`.cuh`용 CUDA 언어도 함께 제공합니다.
+A Zed port of [pytorch-load-inline-highlighter](https://github.com/msaroufim/pytorch-load-inline-highlighter)
+(VS Code). It highlights the C++/CUDA source strings you pass to
+`torch.utils.cpp_extension.load_inline` as C++/CUDA, and adds a CUDA language for `.cu`/`.cuh` files.
 
-## 왜 별도 언어("Python (load_inline)")인가
+The extension provides three things:
 
-VS Code는 TextMate injection으로 기존 Python 문법에 규칙을 끼워 넣을 수 있지만, Zed는 언어
-주입 규칙이 각 언어의 `injections.scm` 안에 있고 **확장이 내장 Python 언어를 덮어쓸 수 없습니다**
-(같은 이름으로 등록하면 거부됨). 그래서 이 확장은 Zed 내장 Python의 쿼리를 그대로 가져온
-`Python (load_inline)` 언어를 따로 만들고, 거기에 load_inline 규칙을 추가했습니다.
+1. **`Python (load_inline)` language**: looks exactly like Zed's built-in Python, but highlights
+   matching strings as C++/CUDA.
+2. **`CUDA` language**: used for `.cu`/`.cuh` files and for injected CUDA strings.
+3. **Language servers**: attaches basedpyright and Ruff to `Python (load_inline)` files.
 
-내장 Python 언어 서버(basedpyright, ruff)는 "Python" 언어에만 붙기 때문에, 이 확장이
-같은 서버를 `Python (load_inline)`용으로 직접 띄웁니다.
+Installation, highlighting and language servers were verified on Zed 1.2.6 (macOS, Apple Silicon).
 
-| 서버 id | 실행 파일 | 없을 때 |
+## Requirements
+
+| Item | When needed | Notes |
 | --- | --- | --- |
-| `load-inline-basedpyright` | PATH의 `basedpyright-langserver` | npm으로 `basedpyright` 설치 |
-| `load-inline-ruff` | PATH의 `ruff` (`ruff server`) | GitHub 최신 릴리스 다운로드 |
+| Zed (with extension API 0.7.0) | Always | Verified on 1.2.6 |
+| Rust installed via rustup | Only when installing or rebuilding | Homebrew `rust` cannot build it (see Install, step 1) |
+| Network access | First install | Downloads wasi-sdk, tree-sitter-cuda and, if needed, basedpyright/ruff |
+| Node.js | When basedpyright is auto-installed | Zed uses `node` from PATH or downloads its own |
+| NVIDIA GPU, CUDA Toolkit | **Not needed** | Highlighting only, so it works on macOS too |
 
-실행 파일을 직접 지정하려면 `"lsp": { "load-inline-ruff": { "binary": { "path": "...", "arguments": ["server"] } } }`
-처럼 `binary.path`를 쓰면 위 탐색보다 우선합니다.
+## Install (dev extension)
 
-`lsp.load-inline-basedpyright` / `lsp.load-inline-ruff` 설정이 없으면 Zed의
-`lsp.basedpyright` / `lsp.ruff` 설정을 그대로 씁니다. 워크트리 루트의 `.venv`/`venv`를
-자동으로 인터프리터로 잡습니다(직접 지정한 값이 있으면 그쪽이 우선).
+1. **rustup's Rust must come before Homebrew's Rust on PATH.** Zed builds dev extensions with
+   `cargo build --target wasm32-wasip2`. Homebrew's `rust` does not ship that target, so the build
+   fails with `can't find crate for core`. Do one of the following:
+   - Without changing your shell config: quit Zed completely, then launch it from a terminal:
+     ```sh
+     PATH="$HOME/.cargo/bin:$PATH" /Applications/Zed.app/Contents/MacOS/zed
+     ```
+     (Zed launched from a terminal keeps that PATH instead of reloading the login shell environment.)
+   - Permanently: add `export PATH="$HOME/.cargo/bin:$PATH"` at the end of `~/.zshrc`, or run
+     `brew uninstall rust`, then restart Zed.
+2. Command palette → **zed: install dev extension** → select this directory. The first build takes
+   20–30 seconds.
+3. Open `examples/load_inline_example.py` and `examples/vector_add.cu` to check.
 
-툴체인 선택기, pytest 실행 버튼(runnables), 디버거 설정 같은 내장 Python 전용 기능은
-`Python (load_inline)`에서는 동작하지 않습니다.
+After the first install, Zed launched normally (Dock etc.) keeps working. Step 1 only matters again
+when you **Rebuild** or reinstall the extension from the Extensions page. To remove it, use
+**Uninstall** on the Extensions page (⌘⇧X).
 
-## 설치 (dev extension)
+## When it works
 
-1. **rustup의 Rust가 PATH에서 Homebrew Rust보다 앞에 있어야 합니다.** Zed는 dev extension을
-   `cargo build --target wasm32-wasip2`로 빌드하는데, Homebrew `rust`에는 이 타깃이 없습니다.
-   예: `~/.zshrc` 맨 끝에 `export PATH="$HOME/.cargo/bin:$PATH"` 추가(또는 `brew uninstall rust`)
-   후 Zed를 완전히 종료했다가 다시 실행.
-2. Zed 명령 팔레트 → **zed: install dev extension** → 이 디렉터리 선택.
-3. `examples/load_inline_example.py`, `examples/vector_add.cu`를 열어 확인.
+### 1. When a file uses `Python (load_inline)`
 
-빌드 실패 로그는 명령 팔레트의 **zed: open log**에서 볼 수 있습니다.
+`*.py` files **keep using Zed's built-in Python by default**; this extension does not claim the
+`py` extension. Use one of the following to opt in. The language name in the bottom-right of the
+status bar shows which language a file uses.
 
-## 파일을 이 언어로 열기
+| Method | Condition |
+| --- | --- |
+| Modeline | `# vim: set ft=load_inline:` within the **first or last 5 lines** of the file (`load-inline` and `torch-inline` also work, case-insensitive). Disabled when Zed's `modeline_lines` setting is 0. |
+| `file_types` | Globs in `settings.json`, e.g. `"file_types": { "Python (load_inline)": ["**/kernels/**/*.py"] }`. Use `["py"]` for every `.py` file. |
+| Manual | Pick `Python (load_inline)` in the status bar language selector (applies to that buffer only). |
 
-`*.py`는 기본적으로 내장 Python이 계속 담당합니다. 원하는 파일만 골라서 쓰세요.
+The following **do not work** in `Python (load_inline)` files: the toolchain (interpreter)
+selector, pytest run buttons (runnables) and Python debugger configuration. Zed wires those to the
+built-in "Python" language only, and extensions have no way to attach them.
 
-- **파일별(modeline):** 파일 첫 줄이나 마지막 줄에
-  ```python
-  # vim: set ft=load_inline:
-  ```
-- **경로별(settings.json):**
-  ```jsonc
-  {
-    "file_types": {
-      "Python (load_inline)": ["**/kernels/**/*.py", "*_ext.py"],
-      // Zed 내장 C++도 .cu/.cuh를 주장하므로, CUDA 언어로 확실히 열려면:
-      "CUDA": ["cu", "cuh"]
-    }
-  }
-  ```
-- **수동:** 상태 표시줄의 언어 선택기에서 `Python (load_inline)`.
+### 2. When a string is highlighted as C++/CUDA
 
-포매터/import 정리를 내장 Python처럼 쓰려면:
+Inside a `Python (load_inline)` file, the rules below are checked **top to bottom** and only the
+first match applies, so a string is never highlighted twice.
+
+| Priority | Rule | Highlighted as CUDA | Highlighted as C++ |
+| --- | --- | --- | --- |
+| 1 | Keyword argument name (in any call) | `cuda_sources=`, `hip_sources=` | `cpp_sources=` |
+| 2 | Assigned variable name (case-insensitive, so `CUDA_SRC` counts) | `cuda_*`, `hip_*`, `kernel_code`, `*_cuda`, `*_cu`, `*_hip`, `*_kernel` | `cpp_*`, `*_cpp` |
+| 3 | Content of the assigned string | contains `__global__` `__device__` `__host__` `threadIdx` `blockIdx` `blockDim` `gridDim` | contains `torch::Tensor` or `#include <torch/...>` |
+| 4 | Marker comment above the assignment | `# cuda`, `# hip`, `# language=cuda`, `# lang: cuda` | `# cpp`, `# c++`, `# language=cpp` |
+
+- Rule 1 applies when the value is a string, or a list/tuple of strings. If you pass variables
+  (`cuda_sources=[a_src, b_src]`), each variable is judged where it is defined, by rules 2–4.
+- In rule 2 a prefix beats a suffix: `cpp_kernel` is C++, `cuda_wrapper_cpp` is CUDA. Only names
+  are case-insensitive; the rule 3 keywords are matched exactly, as they are case-sensitive in C++.
+- Rules 2–4 apply only to assignments of the form `name = "..."`, `self.name = "..."` or
+  `name: str = "..."`.
+- A rule 4 marker must sit directly above the assignment. Blank lines in between are fine; another
+  comment in between is not.
+- Plain strings, `r"..."`, `b"..."` and triple-quoted strings all work.
+- In f-strings (`f"""... {BLOCK} ..."""`), the `{...}` parts stay Python and the remaining pieces
+  are highlighted together as one C++/CUDA document.
+- HIP sources are highlighted with the CUDA grammar.
+
+**Not highlighted** (verified examples):
+
+| Code | Why | Instead |
+| --- | --- | --- |
+| `cuda_src += "..."` | `+=` is not covered by the assignment rules | Write it as one string |
+| `cuda_src = ("..." "...")` | Implicitly concatenated strings | Use one triple-quoted string |
+| `{"cuda": "__global__ ..."}`, `return "__global__ ..."` | Not an assignment | Assign it to a variable first |
+| `load_inline("m", "torch::Tensor f();")` | Positional arguments have no name | Use a keyword argument or a variable |
+| `load_inline(cuda_src="...")` | Only `*_sources` keyword arguments count | — |
+| `a_src, b_src = "...", "..."` | Multiple targets in one assignment | One assignment per line |
+| Docstrings, `print("__global__")` | Rule 3 only looks at assignments, to avoid false positives | — |
+
+### 3. When `.cu`/`.cuh` files use the CUDA language
+
+This extension's CUDA language registers the `cu`/`cuh` extensions. **Zed's built-in C++ registers
+them too**, so they may open as C++ depending on your setup (they opened as CUDA in the verified
+setup). To be sure:
+
+```jsonc
+{ "file_types": { "CUDA": ["cu", "cuh"] } }
+```
+
+A `// vim: set ft=cuda:` modeline also works. On top of C++ highlighting, the CUDA language
+highlights qualifiers such as `__global__`, built-in variables such as `threadIdx`, intrinsics such
+as `__syncthreads`, `atomicAdd` and `cuda*`, and `<<< >>>` kernel launches. No language server
+(clangd etc.) is attached.
+
+### 4. When the language servers run
+
+| Condition | Details |
+| --- | --- |
+| The file's language is `Python (load_inline)` | Built-in Python files keep Zed's own servers. |
+| The project is **trusted** | Servers do not start in Zed's Restricted Mode. Click **⚠ Restricted Mode** at the top left of the window to trust the project. |
+| The executable can be found | Looked up in the order below. |
+
+| Server id | 1) Settings | 2) PATH | 3) Auto-install |
+| --- | --- | --- | --- |
+| `load-inline-basedpyright` | `lsp.<id>.binary.path` | `basedpyright-langserver` | Latest `basedpyright` from npm |
+| `load-inline-ruff` | `lsp.<id>.binary.path` | `ruff` (run as `ruff server`, needs ruff 0.5+) | Latest `astral-sh/ruff` GitHub release |
+
+- PATH means **the PATH of a shell opened in the project folder** (including direnv, an activated
+  venv and pyenv shims).
+- Auto-installed copies live in
+  `~/Library/Application Support/Zed/extensions/work/pytorch-load-inline/`. Once installed, the
+  server also starts offline from that copy.
+- Settings come from `lsp.load-inline-basedpyright` / `lsp.load-inline-ruff` when present,
+  otherwise from Zed's `lsp.basedpyright` / `lsp.ruff`. `binary.arguments` replaces the default
+  arguments, and `binary.env` is layered over the shell environment.
+- **Interpreter (venv):** if `.venv/pyvenv.cfg` or `venv/pyvenv.cfg` exists at the project root,
+  that environment is passed to basedpyright. If your settings contain any of `python`,
+  `pythonPath`, `venvPath`, `venv` or `defaultInterpreterPath`, your value wins. For environments
+  elsewhere, set `venvPath`/`venv` in `pyrightconfig.json` or `pyproject.toml`.
+- basedpyright uses the same defaults as built-in Python: `typeCheckingMode: "standard"`, and import
+  organizing is left to Ruff (`disableOrganizeImports`). Values in your settings take precedence.
+- Not yet verified in SSH remote projects.
+
+To format and organize imports like built-in Python:
 
 ```jsonc
 {
@@ -73,40 +155,45 @@ VS Code는 TextMate injection으로 기존 Python 문법에 규칙을 끼워 넣
 }
 ```
 
-## 감지 규칙
+## Troubleshooting
 
-`languages/python-load-inline/injections.scm`. 한 문자열에는 최대 한 번만 주입되도록 서로
-배타적으로 작성했습니다(Zed는 패턴 간 중복 주입을 합치지 않음). 우선순위:
+| Symptom | What to check |
+| --- | --- |
+| Build fails on install (`can't find crate for core`) | Homebrew Rust is picked up first → Install, step 1 |
+| Strings look like plain Python strings | Is the status bar language `Python (load_inline)`? → When it works, 1. If so → the rules and the "Not highlighted" table in 2 |
+| `.cu` opens as C++ | Add `"CUDA": ["cu", "cuh"]` to `file_types` |
+| No diagnostics or hover | Restricted Mode? Do `load-inline-*` servers appear in **dev: open language server logs**? |
+| basedpyright cannot resolve imports | Venv location → the interpreter item in When it works, 4 |
+| Anything else | Command palette → **zed: open log** |
 
-1. **키워드 인자:** `cpp_sources=` → C++, `cuda_sources=` / `hip_sources=` → CUDA
-   (문자열, 문자열 list/tuple 모두)
-2. **변수 이름:** `cuda_*` `hip_*` `kernel_code` `*_cuda` `*_cu` `*_hip` `*_kernel` → CUDA,
-   `cpp_*` `*_cpp` → C++ (접두사가 접미사보다 우선: `cpp_kernel`은 C++)
-3. **내용:** `__global__`/`__device__`/`__host__`/`threadIdx`/`blockIdx`/... → CUDA,
-   `torch::Tensor`/`#include <torch/...>` → C++ (대입문만; docstring·함수 인자는 제외)
-4. **마커 주석:** 대입문 바로 윗줄의 `# cuda`, `# cpp`, `# c++`, `# language=cuda`
+## Why a separate language
 
-f-string(`f"""... {BLOCK} ..."""`)은 보간 사이의 조각들을 하나의 C++ 문서로 파싱합니다.
-HIP 소스는 CUDA 문법으로 칠합니다.
+VS Code lets an extension inject rules into the existing Python grammar through TextMate injection.
+In Zed, injection rules live in each language's own `injections.scm`, and **an extension cannot
+override the built-in Python language** (registering the same name is rejected). So this extension
+copies Zed's built-in Python queries into a separate `Python (load_inline)` language and adds its
+rules there. Zed's Python language servers are also bound to "Python" only, so the extension starts
+the same servers for its own language.
 
-## 개발
+## Development
 
 ```sh
-scripts/check.sh                                   # 쿼리 테스트 + Rust 테스트 + clippy
-ZED_EXTENSION_CLI=/path/to/zed-extension scripts/check.sh   # Zed 공식 CLI 검증까지
+scripts/check.sh                                            # query tests + Rust tests + clippy
+ZED_EXTENSION_CLI=/path/to/zed-extension scripts/check.sh   # plus validation with Zed's extension CLI
 ```
 
-- 쿼리 테스트(`tests/`, pytest): 모든 `.scm`이 실제 문법(tree-sitter-python 0.25, `extension.toml`에
-  고정된 tree-sitter-cuda)에서 컴파일되는지, `tests/fixtures/injections.py`의 `EXPECT:<lang>` 표시대로
-  정확히 한 번씩 주입되는지 확인합니다.
-- `zed-extension`은 Zed 저장소에서 `cargo build --release -p extension_cli`로 빌드합니다.
-- `extension.toml`에 `[grammars.python]`을 **넣지 마세요.** 확장이 언로드될 때 Zed가 그 이름의
-  문법을 지워서 내장 Python 문법까지 사라집니다.
+- Query tests (`tests/`, pytest) check that every `.scm` compiles against the real grammars
+  (tree-sitter-python 0.25 and the tree-sitter-cuda revision pinned in `extension.toml`), and that
+  strings in `tests/fixtures/injections.py` are injected exactly once, as their `EXPECT:<lang>`
+  markers say. When changing a rule, add an example to the fixture first.
+- Build `zed-extension` from the Zed repository with `cargo build --release -p extension_cli`.
+- **Do not add `[grammars.python]` to `extension.toml`.** When an extension is unloaded, Zed removes
+  every grammar it declared by name, which would also remove the built-in Python grammar.
 
-## 출처와 라이선스
+## Credits and license
 
-- `languages/python-load-inline/*.scm`, `languages/cuda/*.scm`, 두 `config.toml`은 Zed
-  v1.2.6의 `crates/grammars/src/{python,cpp}`에서 가져와 수정했습니다(GPL-3.0-or-later).
-  그래서 이 확장도 GPL-3.0-or-later입니다(`LICENSE`).
-- CUDA 문법: [tree-sitter-grammars/tree-sitter-cuda](https://github.com/tree-sitter-grammars/tree-sitter-cuda) (MIT).
-- 감지 규칙은 [msaroufim/pytorch-load-inline-highlighter](https://github.com/msaroufim/pytorch-load-inline-highlighter)를 따랐습니다.
+- `languages/python-load-inline/*.scm`, `languages/cuda/*.scm` and both `config.toml` files are
+  adapted from Zed v1.2.6 `crates/grammars/src/{python,cpp}` (GPL-3.0-or-later), so this extension
+  is GPL-3.0-or-later as well (`LICENSE`).
+- CUDA grammar: [tree-sitter-grammars/tree-sitter-cuda](https://github.com/tree-sitter-grammars/tree-sitter-cuda) (MIT).
+- Detection rules follow [msaroufim/pytorch-load-inline-highlighter](https://github.com/msaroufim/pytorch-load-inline-highlighter).
