@@ -241,6 +241,17 @@ grammars by name:
   the same, but it runs as WebAssembly. Uninstalling removes the `python` grammar from the running
   Zed, so regular Python files lose highlighting until Zed restarts.
 
+## Roadmap
+
+- **HIP (AMD ROCm)**: HIP strings currently parse with the CUDA grammar, but HIP-specific names
+  are plain identifiers. Planned, within the CUDA language rather than as a separate HIP
+  language:
+  - highlight HIP runtime APIs (`hipMalloc`, `hipDeviceSynchronize`, `hipLaunchKernelGGL`, ...)
+    and built-ins (`hipThreadIdx_x`, `hipBlockIdx_x`, ...) like their `cuda*` counterparts;
+  - detect HIP strings by content (`hipLaunchKernelGGL`, `hipThreadIdx_x`,
+    `#include <hip/hip_runtime.h>`) as well as by name;
+  - add HIP snippets.
+
 ## Development
 
 ```sh
