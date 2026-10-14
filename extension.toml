@@ -1,9 +1,9 @@
-id = "pytorch-load-inline"
-name = "PyTorch load_inline"
+id = "pytorch-inline-kernels"
+name = "PyTorch Inline Kernels"
 version = "0.1.0"
 schema_version = 1
 authors = ["Jun Park <pj2417@gmail.com>"]
-description = "Highlights C++/CUDA sources embedded in Python strings for torch.utils.cpp_extension.load_inline, and adds a CUDA language."
+description = "C++/CUDA kernels written inline in Python for PyTorch (load_inline): highlighting, CUDA language, CUDA and PyTorch C++ snippets, and Python language servers."
 
 # Generated from snippets/src/ by scripts/build_snippets.py. Zed keys snippet
 # files by language: cuda.json -> CUDA, c++.json -> C++ (every C++ file).

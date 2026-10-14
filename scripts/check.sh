@@ -32,7 +32,7 @@ if [[ -n "${ZED_EXTENSION_CLI:-}" ]]; then
     # to this throwaway copy. Pinned to the tree-sitter-python Zed links (0.25).
     # Packaging after validation also wants a `repository`, which a local dev
     # extension does not need; give the copy a placeholder.
-    sed -i.bak 's|^schema_version = 1$|schema_version = 1\nrepository = "https://example.invalid/pytorch-load-inline"|' \
+    sed -i.bak 's|^schema_version = 1$|schema_version = 1\nrepository = "https://example.invalid/pytorch-inline-kernels"|' \
         "$work/src/extension.toml"
     cat >>"$work/src/extension.toml" <<'EOF'
 

@@ -1,8 +1,9 @@
-# PyTorch load_inline for Zed
+# PyTorch Inline Kernels for Zed
 
-A Zed port of [pytorch-load-inline-highlighter](https://github.com/msaroufim/pytorch-load-inline-highlighter)
-(VS Code). It highlights the C++/CUDA source strings you pass to
-`torch.utils.cpp_extension.load_inline` as C++/CUDA, and adds a CUDA language for `.cu`/`.cuh` files.
+Zed support for C++/CUDA kernels written inline in Python for PyTorch: the source strings you pass
+to `torch.utils.cpp_extension.load_inline` are highlighted as C++/CUDA, with snippets for CUDA and
+the PyTorch C++ extension API. It started as a port of the VS Code extension
+[pytorch-load-inline-highlighter](https://github.com/msaroufim/pytorch-load-inline-highlighter).
 
 The extension provides four things:
 
@@ -132,7 +133,7 @@ as `__syncthreads`, `atomicAdd` and `cuda*`, and `<<< >>>` kernel launches. No l
 - PATH means **the PATH of a shell opened in the project folder** (including direnv, an activated
   venv and pyenv shims).
 - Auto-installed copies live in
-  `~/Library/Application Support/Zed/extensions/work/pytorch-load-inline/`. Once installed, the
+  `~/Library/Application Support/Zed/extensions/work/pytorch-inline-kernels/`. Once installed, the
   server also starts offline from that copy.
 - Settings come from `lsp.load-inline-basedpyright` / `lsp.load-inline-ruff` when present,
   otherwise from Zed's `lsp.basedpyright` / `lsp.ruff`. `binary.arguments` replaces the default

@@ -408,6 +408,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "pytorch-inline-kernels"
+version = "0.1.0"
+dependencies = [
+ "zed_extension_api",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -749,13 +756,6 @@ dependencies = [
  "quote",
  "syn 3.0.9",
  "synstructure",
-]
-
-[[package]]
-name = "zed-load-inline"
-version = "0.1.0"
-dependencies = [
- "zed_extension_api",
 ]
 
 [[package]]
