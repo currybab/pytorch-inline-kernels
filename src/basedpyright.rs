@@ -120,6 +120,13 @@ pub fn workspace_configuration(worktree: &Worktree) -> zed::Result<Option<Value>
     )))
 }
 
+/// Finds `.venv`/`venv` at the worktree root through Zed's file index.
+///
+/// Zed does not index the contents of a directory the project's .gitignore
+/// excludes (Python's standard .gitignore lists both names), so this often
+/// finds nothing. That is fine for `.venv`: with no interpreter configured,
+/// basedpyright picks up `<root>/.venv` itself. A gitignored `venv/` needs the
+/// user's settings.
 fn detect_venv(worktree: &Worktree) -> Option<VirtualEnv> {
     let (os, _) = zed::current_platform();
     let windows = matches!(os, zed::Os::Windows);

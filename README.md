@@ -144,13 +144,21 @@ as `__syncthreads`, `atomicAdd` and `cuda*`, and `<<< >>>` kernel launches. No l
 - Auto-installed copies live in
   `~/Library/Application Support/Zed/extensions/work/pytorch-inline-kernels/`. Once installed, the
   server also starts offline from that copy.
-- Settings come from `lsp.load-inline-basedpyright` / `lsp.load-inline-ruff` when present,
-  otherwise from Zed's `lsp.basedpyright` / `lsp.ruff`. `binary.arguments` replaces the default
-  arguments, and `binary.env` is layered over the shell environment.
-- **Interpreter (venv):** if `.venv/pyvenv.cfg` or `venv/pyvenv.cfg` exists at the project root,
-  that environment is passed to basedpyright. If your settings contain any of `python`,
-  `pythonPath`, `venvPath`, `venv` or `defaultInterpreterPath`, your value wins. For environments
-  elsewhere, set `venvPath`/`venv` in `pyrightconfig.json` or `pyproject.toml`.
+- Settings are read per field (`settings`, `initialization_options`, `binary`): from
+  `lsp.load-inline-basedpyright` / `lsp.load-inline-ruff` when that field is set there, otherwise
+  from Zed's `lsp.basedpyright` / `lsp.ruff`. So you can keep your existing Python setup and
+  override a single field under the wrapper id. `binary` is used only when it has a `path`;
+  `binary.arguments` then replaces the default arguments, and `binary.env` is layered over the
+  shell environment.
+- **Interpreter (venv):**
+  - `.venv` at the project root is used automatically: basedpyright itself falls back to
+    `<root>/.venv` when no interpreter is configured.
+  - `venv/` at the project root is used only when your `.gitignore` does not exclude it. Zed does
+    not index the contents of gitignored directories, so the extension cannot see it then.
+  - If your settings contain any of `python`, `pythonPath`, `venvPath`, `venv` or
+    `defaultInterpreterPath`, your value wins.
+  - For any other location, set `venvPath`/`venv` in `pyrightconfig.json` or `pyproject.toml`,
+    or `lsp.load-inline-basedpyright.settings.python.pythonPath`.
 - basedpyright uses the same defaults as built-in Python: `typeCheckingMode: "standard"`, and import
   organizing is left to Ruff (`disableOrganizeImports`). Values in your settings take precedence.
 - Not yet verified in SSH remote projects.
