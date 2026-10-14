@@ -1,0 +1,12 @@
+# Runs a tree-sitter injections query with the same Rust tree-sitter version
+# Zed links, so tests see Zed's predicate semantics rather than py-tree-sitter's.
+[package]
+name = "query_runner"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+streaming-iterator = "0.1"
+tree-sitter = "=0.26.8"
+tree-sitter-python = "=0.25.0"

@@ -186,6 +186,10 @@ ZED_EXTENSION_CLI=/path/to/zed-extension scripts/check.sh   # plus validation wi
   (tree-sitter-python 0.25 and the tree-sitter-cuda revision pinned in `extension.toml`), and that
   strings in `tests/fixtures/injections.py` are injected exactly once, as their `EXPECT:<lang>`
   markers say. When changing a rule, add an example to the fixture first.
+- The injection fixture runs on two engines: py-tree-sitter and `tests/query_runner`, a small Rust
+  binary on the same `tree-sitter` crate version Zed links (built with rustup's cargo on first
+  run). They can disagree: text predicates on a quantified capture work in py-tree-sitter but had
+  no effect in Zed, so trust the Rust result.
 - Build `zed-extension` from the Zed repository with `cargo build --release -p extension_cli`.
 - **Do not add `[grammars.python]` to `extension.toml`.** When an extension is unloaded, Zed removes
   every grammar it declared by name, which would also remove the built-in Python grammar.

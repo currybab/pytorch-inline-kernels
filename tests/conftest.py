@@ -9,6 +9,7 @@ grammar Zed will compile for the extension.
 from __future__ import annotations
 
 import ctypes
+import os
 import shutil
 import subprocess
 import sys
@@ -66,6 +67,30 @@ def wrap_in_capsule(pointer: int) -> object:
     capsule_new.restype = ctypes.py_object
     capsule_new.argtypes = (ctypes.c_void_p, ctypes.c_char_p, ctypes.c_void_p)
     return capsule_new(pointer, b"tree_sitter.Language", None)
+
+
+QUERY_RUNNER_DIR = ROOT / "tests" / "query_runner"
+RUSTUP_CARGO_BIN = Path.home() / ".cargo" / "bin"
+
+
+def build_query_runner() -> Path:
+    """Builds the Rust query runner (same tree-sitter crate version as Zed)."""
+    env = {**os.environ, "PATH": f"{RUSTUP_CARGO_BIN}{os.pathsep}{os.environ.get('PATH', '')}"}
+    result = subprocess.run(
+        ["cargo", "build", "-q", "--release"],
+        cwd=QUERY_RUNNER_DIR,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"building tests/query_runner failed:\n{result.stderr}")
+    return QUERY_RUNNER_DIR / "target" / "release" / "query_runner"
+
+
+@pytest.fixture(scope="session")
+def query_runner() -> Path:
+    return build_query_runner()
 
 
 @pytest.fixture(scope="session")

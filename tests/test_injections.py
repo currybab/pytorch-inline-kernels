@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -39,6 +40,7 @@ def parse_fixture(language: Language) -> Node:
 
 
 def collect_injections(language: Language, root: Node) -> tuple[Injection, ...]:
+    """Runs the query with py-tree-sitter."""
     query = Query(language, INJECTIONS.read_text())
     injections = []
     for pattern_index, captures in QueryCursor(query).matches(root):
@@ -48,6 +50,25 @@ def collect_injections(language: Language, root: Node) -> tuple[Injection, ...]:
             continue
         ranges = tuple((node.start_byte, node.end_byte) for node in nodes)
         injections.append(Injection(injection_language, ranges))
+    return tuple(injections)
+
+
+def collect_injections_rust(runner: Path) -> tuple[Injection, ...]:
+    """Runs the query with the Rust tree-sitter crate Zed uses (tests/query_runner).
+
+    The two engines can disagree on text predicates over quantified captures,
+    and Zed's behavior is the one that matters.
+    """
+    result = subprocess.run(
+        [str(runner), str(INJECTIONS), str(FIXTURE)], capture_output=True, text=True, check=True
+    )
+    injections = []
+    for line in result.stdout.splitlines():
+        injection_language, ranges = line.split("\t")
+        if injection_language in UNRELATED_LANGUAGES:
+            continue
+        spans = tuple(tuple(int(n) for n in span.split("-")) for span in ranges.split(","))
+        injections.append(Injection(injection_language, spans))
     return tuple(injections)
 
 
@@ -76,9 +97,11 @@ def fixture_tree(python_language: Language) -> Node:
     return parse_fixture(python_language)
 
 
-@pytest.fixture(scope="module")
-def injections(python_language: Language, fixture_tree: Node) -> tuple[Injection, ...]:
-    return collect_injections(python_language, fixture_tree)
+@pytest.fixture(scope="module", params=["py-tree-sitter", "zed-rust-tree-sitter"])
+def injections(request: pytest.FixtureRequest, python_language: Language, fixture_tree: Node) -> tuple[Injection, ...]:
+    if request.param == "py-tree-sitter":
+        return collect_injections(python_language, fixture_tree)
+    return collect_injections_rust(request.getfixturevalue("query_runner"))
 
 
 def test_fixture_has_expectations(fixture_tree: Node) -> None:

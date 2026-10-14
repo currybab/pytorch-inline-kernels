@@ -39,6 +39,11 @@
 ;                              torch::Tensor, <torch/...>   -> cpp
 ;   4. marker comment          `# cuda`, `# cpp`, `# language=cuda` on the line above
 ;
+; Content checks use `@_str`, the whole string node, never the quantified
+; `@injection.content`: with Zed's Rust tree-sitter (0.26.8), `#any-match?` and
+; `#not-match?` on that quantified capture had no effect, so the content rules
+; matched every string. tests/query_runner runs the fixture on that engine.
+;
 ; `[(string_content) (interpolation)]+` puts every literal segment of an f-string
 ; into a single injection, so `f"""... {BLOCK} ..."""` kernels parse as one C++
 ; document instead of one broken layer per segment.
@@ -70,7 +75,7 @@
     (identifier) @_name
     (attribute attribute: (identifier) @_name)
   ]
-  right: (string [(string_content) @injection.content (interpolation)]+)
+  right: (string [(string_content) @injection.content (interpolation)]+) @_str
   (#match? @_name "(?i)^((cuda|hip)_|kernel_code$)")
   (#set! injection.language "cuda"))
 
@@ -79,7 +84,7 @@
     (identifier) @_name
     (attribute attribute: (identifier) @_name)
   ]
-  right: (string [(string_content) @injection.content (interpolation)]+)
+  right: (string [(string_content) @injection.content (interpolation)]+) @_str
   (#match? @_name "(?i)_(cuda|cu|hip|kernel)$")
   (#not-match? @_name "(?i)^(cuda|hip|cpp)_")
   (#set! injection.language "cuda"))
@@ -89,7 +94,7 @@
     (identifier) @_name
     (attribute attribute: (identifier) @_name)
   ]
-  right: (string [(string_content) @injection.content (interpolation)]+)
+  right: (string [(string_content) @injection.content (interpolation)]+) @_str
   (#match? @_name "(?i)^cpp_")
   (#set! injection.language "cpp"))
 
@@ -98,7 +103,7 @@
     (identifier) @_name
     (attribute attribute: (identifier) @_name)
   ]
-  right: (string [(string_content) @injection.content (interpolation)]+)
+  right: (string [(string_content) @injection.content (interpolation)]+) @_str
   (#match? @_name "(?i)_cpp$")
   (#not-match? @_name "(?i)^(cuda|hip|cpp)_")
   (#set! injection.language "cpp"))
@@ -109,9 +114,9 @@
     (identifier) @_name
     (attribute attribute: (identifier) @_name)
   ]
-  right: (string [(string_content) @injection.content (interpolation)]+)
+  right: (string [(string_content) @injection.content (interpolation)]+) @_str
   (#not-match? @_name "(?i)^(cuda|hip|cpp)_|_(cuda|cu|hip|kernel|cpp)$|^kernel_code$")
-  (#any-match? @injection.content "__(global|device|host)__|\\b(blockIdx|threadIdx|blockDim|gridDim)\\b")
+  (#match? @_str "__(global|device|host)__|\\b(blockIdx|threadIdx|blockDim|gridDim)\\b")
   (#set! injection.language "cuda"))
 
 (assignment
@@ -119,10 +124,10 @@
     (identifier) @_name
     (attribute attribute: (identifier) @_name)
   ]
-  right: (string [(string_content) @injection.content (interpolation)]+)
+  right: (string [(string_content) @injection.content (interpolation)]+) @_str
   (#not-match? @_name "(?i)^(cuda|hip|cpp)_|_(cuda|cu|hip|kernel|cpp)$|^kernel_code$")
-  (#not-match? @injection.content "__(global|device|host)__|\\b(blockIdx|threadIdx|blockDim|gridDim)\\b")
-  (#any-match? @injection.content "torch::Tensor|#include\\s*<torch/")
+  (#not-match? @_str "__(global|device|host)__|\\b(blockIdx|threadIdx|blockDim|gridDim)\\b")
+  (#match? @_str "torch::Tensor|#include\\s*<torch/")
   (#set! injection.language "cpp"))
 
 ; 4. marker comment directly above an assignment that nothing else claimed.
@@ -134,10 +139,10 @@
         (identifier) @_name
         (attribute attribute: (identifier) @_name)
       ]
-      right: (string [(string_content) @injection.content (interpolation)]+)))
+      right: (string [(string_content) @injection.content (interpolation)]+) @_str))
   (#match? @_comment "^#\\s*((language|lang)\\s*[=:]\\s*)?(?i:cuda|hip)\\s*$")
   (#not-match? @_name "(?i)^(cuda|hip|cpp)_|_(cuda|cu|hip|kernel|cpp)$|^kernel_code$")
-  (#not-match? @injection.content "__(global|device|host)__|\\b(blockIdx|threadIdx|blockDim|gridDim)\\b|torch::Tensor|#include\\s*<torch/")
+  (#not-match? @_str "__(global|device|host)__|\\b(blockIdx|threadIdx|blockDim|gridDim)\\b|torch::Tensor|#include\\s*<torch/")
   (#set! injection.language "cuda"))
 
 ((comment) @_comment
@@ -148,8 +153,8 @@
         (identifier) @_name
         (attribute attribute: (identifier) @_name)
       ]
-      right: (string [(string_content) @injection.content (interpolation)]+)))
+      right: (string [(string_content) @injection.content (interpolation)]+) @_str))
   (#match? @_comment "^#\\s*((language|lang)\\s*[=:]\\s*)?(?i:cpp|c\\+\\+)\\s*$")
   (#not-match? @_name "(?i)^(cuda|hip|cpp)_|_(cuda|cu|hip|kernel|cpp)$|^kernel_code$")
-  (#not-match? @injection.content "__(global|device|host)__|\\b(blockIdx|threadIdx|blockDim|gridDim)\\b|torch::Tensor|#include\\s*<torch/")
+  (#not-match? @_str "__(global|device|host)__|\\b(blockIdx|threadIdx|blockDim|gridDim)\\b|torch::Tensor|#include\\s*<torch/")
   (#set! injection.language "cpp"))
